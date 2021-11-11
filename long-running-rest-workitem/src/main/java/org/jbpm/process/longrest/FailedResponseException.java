@@ -13,18 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jbpm.process.longrest.util;
+package org.jbpm.process.longrest;
 
-import java.io.Serializable;
+public class FailedResponseException extends Exception {
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+    private int statusCode;
 
-public class Mapper implements Serializable {
+    public FailedResponseException(String message, int statusCode) {
+        super(message);
+        this.statusCode = statusCode;
+    }
 
-    private static final ObjectMapper objectMapper = new ObjectMapper();
-
-    public static ObjectMapper getInstance() {
-        return objectMapper;
+    public int getStatusCode() {
+        return statusCode;
     }
 }

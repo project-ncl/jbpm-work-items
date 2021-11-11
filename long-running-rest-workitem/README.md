@@ -46,18 +46,19 @@ Sub-process input parameters, to configure the remote service invocation. (* = m
 Request template
 ================
 Is a message body sent when invoking remote task.
-In the template you can use process input parameters, values from other task results and predefined _system_ properties.
+In the template you can use process input parameters, values from other task results and predefined _system_ variables, eg. `org.jbpm.process.longrest.util.ProcessUtils.getSystemVariables().getCallbackUrl()`
 For an example see `org.jbpm.contrib.longrest.bpm.TestFunctions.getPreBuildTemplate()`.
 
-**System properties**
-- system.callbackUrl
-- system.callbackMethod
-- system.heartBeatUrl
-- system.heartBeatMethod
+**System variables**
+- callbackUrl
+- callbackMethod
+- heartBeatUrl
+- heartBeatMethod
 
 **Including whole object map**
 Note that all values are stored as nested maps, 
 to include the whole object in the template you have to serialize it and to unescape it, to prevent double json escape.
+#TODO update the doc, this has been removed
 Use `org.jbpm.contrib.longrest.util.Mapper().writeValueAsString(object, true)` to unescape the serialized object.
 See `org.jbpm.contrib.longrest.bpm.TestFunctions.getCompletionTemplate()`.
 
@@ -153,6 +154,10 @@ The url to send the beat is provided by the system variables `system.heartBeatUr
 Setting up
 ==========
 Upload this work item handler to your JBPM server and import the `execute-rest.bpmn` (src/main/resources/execute-rest.bpmn) process as an asset to your project.
+
+Heartbeat monitor requires a global reoccurring command HeartbeatMonitorCommand. Upload the `long-running-rest-workitem-VER-heartbeat-command.jar` to kie server `$eap-home/standalone/deployments/ROOT.war/WEB-INF/lib`
+and start the job `org.jbpm.process.longrest.HeartbeatMonitorCommand` using web console (manage / jobs) or REST endpoint.
+By default, the validation runs every 5 seconds it can be changed by setting the job parameter `heartbeatValidation` (java duration format, default: 'PT5S').
 
 To design your task invocation process use the execute-rest as a sub-process.
 

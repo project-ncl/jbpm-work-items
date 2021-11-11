@@ -9,7 +9,7 @@
     </layout>
   </appender>
 
-  <logger name="org.jbpm" level="debug" additivity="false">
+  <logger name="org.jbpm" level="info" additivity="false">
     <appender-ref ref="STDOUT"/>
   </logger>
 

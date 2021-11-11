@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeType;
+import org.apache.commons.text.StringSubstitutor;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -52,20 +53,17 @@ import org.jbpm.process.workitem.core.util.service.WidAction;
 import org.jbpm.process.workitem.core.util.service.WidAuth;
 import org.jbpm.process.workitem.core.util.service.WidService;
 import org.kie.api.runtime.KieSession;
+import org.kie.api.runtime.manager.RuntimeEngine;
 import org.kie.api.runtime.manager.RuntimeManager;
 import org.kie.api.runtime.process.WorkItem;
 import org.kie.api.runtime.process.WorkItemManager;
 import org.kie.api.runtime.process.WorkflowProcessInstance;
-import org.mvel2.MVEL;
-import org.mvel2.ParserContext;
-import org.mvel2.integration.VariableResolverFactory;
-import org.mvel2.integration.impl.MapVariableResolverFactory;
-import org.mvel2.templates.CompiledTemplate;
-import org.mvel2.templates.TemplateRuntime;
+import org.kie.internal.runtime.manager.context.ProcessInstanceIdContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.mvel2.templates.TemplateCompiler.compileTemplate;
+import static org.jbpm.process.longrest.Constant.CONTAINER_ID_VARIABLE;
+import static org.jbpm.process.longrest.Constant.PROCESS_INSTANCE_ID_VARIABLE;
 
 @Wid(widfile = "LongRunningRestService.wid",
         name = "LongRunningRestService",
@@ -110,30 +108,16 @@ public class LongRunningRestServiceWorkItemHandler extends AbstractLogOrThrowWor
 
     private final RuntimeManager runtimeManager;
 
-    ParserContext mvelContext = new ParserContext();
-
     public LongRunningRestServiceWorkItemHandler(RuntimeManager runtimeManager) {
         this.runtimeManager = runtimeManager;
         logger.debug("Constructing with runtimeManager ...");
-        initializeMvelContext();
         setLogThrownException(false);
     }
 
     public LongRunningRestServiceWorkItemHandler() {
         logger.debug("Constructing without runtimeManager ...");
         runtimeManager = null;
-        initializeMvelContext();
         setLogThrownException(false);
-    }
-
-    private void initializeMvelContext() {
-        mvelContext.addImport(
-                "quote",
-                MVEL.getStaticMethod(Strings.class, "quoteString", new Class[]{Object.class}));
-        mvelContext.addImport("asJson",
-                              MVEL.getStaticMethod(Mapper.class, "writeValueAsString", new Class[]{Object.class, boolean.class}));
-        mvelContext.addImport("asJson",
-                              MVEL.getStaticMethod(Mapper.class, "writeValueAsString", new Class[]{Object.class}));
     }
 
     public void executeWorkItem(WorkItem workItem, WorkItemManager manager) {
@@ -141,20 +125,23 @@ public class LongRunningRestServiceWorkItemHandler extends AbstractLogOrThrowWor
             RequiredParameterValidator.validate(this.getClass(), workItem);
 
             long processInstanceId = workItem.getProcessInstanceId();
-            WorkflowProcessInstance processInstance = ProcessUtils.getProcessInstance(runtimeManager, processInstanceId);
 
-            String cancelUrlJsonPointer = ProcessUtils.getStringParameter(workItem, Constant.CANCEL_URL_JSON_POINTER_VARIABLE);
-            String cancelUrlTemplate = ProcessUtils.getStringParameter(workItem, Constant.CANCEL_URL_TEMPLATE_VARIABLE);
-            String requestUrl = ProcessUtils.getStringParameter(workItem, "url");
-            String requestMethod = ProcessUtils.getStringParameter(workItem, "method");
-            String requestTemplate = ProcessUtils.getStringParameter(workItem, "template");
-            String requestHeaders = ProcessUtils.getStringParameter(workItem, "headers");
-            int socketTimeout = ProcessUtils.getIntParameter(workItem, "socketTimeout", 5000);
-            int connectTimeout = ProcessUtils.getIntParameter(workItem, "connectTimeout", 5000);
-            int connectionRequestTimeout = ProcessUtils.getIntParameter(workItem, "connectionRequestTimeout", 5000);
-
-            KieSession kieSession = ProcessUtils.getKsession(runtimeManager, processInstanceId);
+            RuntimeEngine runtimeEngine = runtimeManager.getRuntimeEngine(ProcessInstanceIdContext.get(processInstanceId));
+            KieSession kieSession = runtimeEngine.getKieSession();
+            WorkflowProcessInstance processInstance = (WorkflowProcessInstance) kieSession.getProcessInstance(processInstanceId);
             String containerId = (String) kieSession.getEnvironment().get("deploymentId");
+            runtimeManager.disposeRuntimeEngine(runtimeEngine);
+
+            String cancelUrlJsonPointer = ProcessUtils.getParameter(workItem, Constant.CANCEL_URL_JSON_POINTER_VARIABLE, "");
+            String cancelUrlTemplate = ProcessUtils.getParameter(workItem, Constant.CANCEL_URL_TEMPLATE_VARIABLE, "");
+            String requestUrl = ProcessUtils.getParameter(workItem, "url", "");
+            String requestMethod = ProcessUtils.getParameter(workItem, "method", "");
+            String requestTemplate = ProcessUtils.getParameter(workItem, "template", "");
+            String requestHeaders = ProcessUtils.getParameter(workItem, "headers", "");
+            int socketTimeout = ProcessUtils.getParameter(workItem, "socketTimeout", 5000);
+            int connectTimeout = ProcessUtils.getParameter(workItem, "connectTimeout", 5000);
+            int connectionRequestTimeout = ProcessUtils.getParameter(workItem, "connectionRequestTimeout", 5000);
+
 
             //should this service run
             logger.debug("Should run ProcessInstance.id: {}.", processInstance.getId());
@@ -182,6 +169,10 @@ public class LongRunningRestServiceWorkItemHandler extends AbstractLogOrThrowWor
                 String message = MessageFormat.format("Failed to process response. ProcessInstanceId {0}.", processInstanceId);
                 logger.warn(message, e);
                 completeWorkItem(manager, workItem.getId(), e);
+            } catch (FailedResponseException e) {
+                String message = MessageFormat.format("Response failed with status {1}. ProcessInstanceId {0}.", processInstanceId, e.getStatusCode());
+                logger.warn(message, e);
+                completeWorkItem(manager, workItem.getId(), e);
             }
         } catch (Throwable cause) {
             logger.error("Failed to execute workitem handler due to the following error.", cause);
@@ -202,16 +193,18 @@ public class LongRunningRestServiceWorkItemHandler extends AbstractLogOrThrowWor
             String requestHeaders,
             int socketTimeout,
             int connectTimeout,
-            int connectionRequestTimeout) throws RemoteInvocationException, ResponseProcessingException {
+            int connectionRequestTimeout) throws RemoteInvocationException, ResponseProcessingException, FailedResponseException {
 
         logger.debug("requestTemplate: {}", requestTemplate);
 
-        VariableResolverFactory variableResolverFactory = getVariableResolverFactory(processInstance, containerId);
+        Map<String, Object> variables = new HashMap<>();
+        variables.put(PROCESS_INSTANCE_ID_VARIABLE, processInstance.getId());
+        variables.put(CONTAINER_ID_VARIABLE, containerId);
+        StringSubstitutor sub = new StringSubstitutor(variables, "$(", ")");
 
         String requestBodyEvaluated;
         if (requestTemplate != null && !requestTemplate.equals("")) {
-            CompiledTemplate compiled = compileTemplate(requestTemplate, mvelContext);
-            requestBodyEvaluated = (String) TemplateRuntime.execute(compiled, mvelContext, variableResolverFactory);
+            requestBodyEvaluated = sub.replace(requestTemplate);
         } else {
             requestBodyEvaluated = "";
         }
@@ -240,7 +233,7 @@ public class LongRunningRestServiceWorkItemHandler extends AbstractLogOrThrowWor
 
         if (statusCode < 200 || statusCode >= 300) {
             String message = MessageFormat.format("Remote service responded with error status code {0} and reason: {1}. ProcessInstanceId {2}.", statusCode, httpResponse.getStatusLine().getReasonPhrase(), processInstance.getId());
-            throw new RemoteInvocationException(message);
+            throw new FailedResponseException(message, statusCode);
         }
 
         storeCookies(httpResponse, processInstance);
@@ -282,9 +275,7 @@ public class LongRunningRestServiceWorkItemHandler extends AbstractLogOrThrowWor
             try {
                 if (!Strings.isEmpty(cancelUrlTemplate)) {
                     logger.debug("Setting cancel url from template: {}.", cancelUrlTemplate);
-                    CompiledTemplate compiled = compileTemplate(cancelUrlTemplate);
-                    cancelUrl = (String) TemplateRuntime
-                            .execute(compiled, null, variableResolverFactory);
+                    cancelUrl = cancelUrlTemplate;
                 } else if (!Strings.isEmpty(cancelUrlJsonPointer)) {
                     logger.debug("Setting cancel url from json pointer: {}.", cancelUrlJsonPointer);
                     JsonNode cancelUrlNode = root.at(cancelUrlJsonPointer);
@@ -311,54 +302,6 @@ public class LongRunningRestServiceWorkItemHandler extends AbstractLogOrThrowWor
             cookies.putAll(cookiesMap);
         }
         processInstance.setVariable(COOKIES_KEY, cookies);
-    }
-
-    private VariableResolverFactory getVariableResolverFactory(WorkflowProcessInstance processInstance, String containerId) {
-        Map<String, Object> systemVariables = new HashMap<>();
-        String baseUrl = getKieHost() + "/services/rest/server/containers/" + containerId + "/processes/instances/";
-        systemVariables.put(
-                "callbackUrl", baseUrl + processInstance.getId() + "/signal/RESTResponded");
-        systemVariables.put("callbackMethod", "POST");
-        systemVariables.put(
-                "heartBeatUrl",
-                baseUrl + processInstance.getId() + "/signal/imAlive");
-        systemVariables.put("heartBeatMethod", "POST");
-        return getVariableResolverFactoryChain(
-                systemVariables,
-                processInstance);
-    }
-
-    private VariableResolverFactory getVariableResolverFactoryChain(
-            Map<String, Object> systemVariables,
-            WorkflowProcessInstance processInstance) {
-
-        VariableResolverFactory variableResolverFactory = new MapVariableResolverFactory(
-                Collections.singletonMap("system", systemVariables));
-
-        VariableResolverFactory resolver = variableResolverFactory.setNextFactory(
-                new ProcessVariableResolverFactory(processInstance));
-
-        WorkflowProcessInstance currentInstance = processInstance;
-        //add all parent instances to resolver chain
-        int maxDepth = 100;
-        int depth = 0;
-        while (true) {
-            depth++;
-            if (depth > maxDepth) {  //circuit-breaker: allow only maxDepth nested process instances
-                throw new RuntimeException("To many nested process instances, allowed only up to " + maxDepth + ".");
-            }
-            long parentProcessInstanceId = currentInstance.getParentProcessInstanceId();
-            if (parentProcessInstanceId > 0) {
-                WorkflowProcessInstance parentProcessInstance = ProcessUtils.getProcessInstance(
-                        runtimeManager, parentProcessInstanceId);
-                resolver.setNextFactory(new ProcessVariableResolverFactory(parentProcessInstance));
-                currentInstance = parentProcessInstance;
-            } else {
-                //top parent reached
-                break;
-            }
-        }
-        return variableResolverFactory;
     }
 
     private HttpResponse httpRequest(
@@ -401,39 +344,6 @@ public class LongRunningRestServiceWorkItemHandler extends AbstractLogOrThrowWor
             throw new RemoteInvocationException("Unable to invoke remote endpoint.", e);
         }
         return httpResponse;
-    }
-
-    /**
-     * Reads hostname from the system property or environment variable.
-     * System property overrides the env variable.
-     * Https overrides the http variable.
-     *
-     * @return hostName
-     */
-    private String getKieHost() {
-        String host = System.getProperty(Constant.HOSTNAME_HTTPS);
-        if (host != null) {
-            host = "https://" + host;
-        }
-        if (host == null) {
-            host = System.getProperty(Constant.HOSTNAME_HTTP);
-            if (host != null) {
-                host = "http://" + host;
-            }
-        }
-        if (host == null) {
-            host = System.getenv(Constant.HOSTNAME_HTTPS);
-            if (host != null) {
-                host = "https://" + host;
-            }
-        }
-        if (host == null) {
-            host = System.getenv(Constant.HOSTNAME_HTTP);
-            if (host != null) {
-                host = "http://" + host;
-            }
-        }
-        return host;
     }
 
     /**
@@ -487,5 +397,6 @@ public class LongRunningRestServiceWorkItemHandler extends AbstractLogOrThrowWor
     public void abortWorkItem(WorkItem workItem, WorkItemManager manager) {
         completeWorkItem(manager, workItem.getId(), new WorkitemAbortedException());
     }
+
 }
 

@@ -15,27 +15,28 @@
  */
 package org.jbpm.process.longrest.util;
 
-import org.kie.api.runtime.KieSession;
-import org.kie.api.runtime.manager.RuntimeEngine;
-import org.kie.api.runtime.manager.RuntimeManager;
+import org.jbpm.process.longrest.Constant;
+import org.jbpm.process.longrest.SystemVariables;
 import org.kie.api.runtime.process.WorkItem;
-import org.kie.api.runtime.process.WorkflowProcessInstance;
-import org.kie.internal.runtime.manager.context.ProcessInstanceIdContext;
+
+import static org.jbpm.process.longrest.Constant.CONTAINER_ID_VARIABLE;
+import static org.jbpm.process.longrest.Constant.PROCESS_INSTANCE_ID_VARIABLE;
 
 public class ProcessUtils {
 
-    public static WorkflowProcessInstance getProcessInstance(RuntimeManager runtimeManager, long processInstanceId) {
-        return (WorkflowProcessInstance) getKsession(runtimeManager, processInstanceId).getProcessInstance(processInstanceId);
-    }
-
-    public static KieSession getKsession(RuntimeManager runtimeManager, Long processInstanceId) {
-        if (runtimeManager != null) {
-            RuntimeEngine engine = runtimeManager.getRuntimeEngine(ProcessInstanceIdContext.get(processInstanceId));
-            return engine.getKieSession();
+    public static <T> T getParameter(WorkItem workItem, String parameterName, T defaultValue) {
+        Object parameter = workItem.getParameter(parameterName);
+        if (parameter != null) {
+            return (T) parameter;
+        } else {
+            return defaultValue;
         }
-        return null;
     }
 
+    /**
+     * @deprecated see {@link ProcessUtils#getParameter(WorkItem, String, Object)}
+     */
+    @Deprecated
     public static String getStringParameter(WorkItem workItem, String parameterName) {
         Object parameter = workItem.getParameter(parameterName);
         if (parameter != null) {
@@ -45,6 +46,10 @@ public class ProcessUtils {
         }
     }
 
+    /**
+     * @deprecated see {@link ProcessUtils#getParameter(WorkItem, String, Object)}
+     */
+    @Deprecated
     public static int getIntParameter(WorkItem workItem, String parameterName, int defaultValue) {
         Object parameter = workItem.getParameter(parameterName);
         if (parameter != null) {
@@ -52,5 +57,49 @@ public class ProcessUtils {
         } else {
             return defaultValue;
         }
+    }
+
+    /**
+     * Reads hostname from the system property or environment variable.
+     * System property overrides the env variable.
+     * Https overrides the http variable.
+     *
+     * @return hostName
+     */
+    public static String getKieHost() {
+        String host = System.getProperty(Constant.HOSTNAME_HTTPS);
+        if (host != null) {
+            host = "https://" + host;
+        }
+        if (host == null) {
+            host = System.getProperty(Constant.HOSTNAME_HTTP);
+            if (host != null) {
+                host = "http://" + host;
+            }
+        }
+        if (host == null) {
+            host = System.getenv(Constant.HOSTNAME_HTTPS);
+            if (host != null) {
+                host = "https://" + host;
+            }
+        }
+        if (host == null) {
+            host = System.getenv(Constant.HOSTNAME_HTTP);
+            if (host != null) {
+                host = "http://" + host;
+            }
+        }
+        return host;
+    }
+
+    public static SystemVariables getSystemVariables() {
+        //use url friendly '$(var)' instead of commonly used '${var}' (URI.create(String) fails when '${var}' is in the path)
+        String baseUrl = getKieHost() + "/services/rest/server/containers/$(" + CONTAINER_ID_VARIABLE + ")/processes/instances/";
+        return new SystemVariables(
+                baseUrl + "$(" + PROCESS_INSTANCE_ID_VARIABLE + ")/signal/RESTResponded",
+                "POST",
+                baseUrl + "$(" + PROCESS_INSTANCE_ID_VARIABLE + ")/signal/imAlive",
+                "POST"
+        );
     }
 }

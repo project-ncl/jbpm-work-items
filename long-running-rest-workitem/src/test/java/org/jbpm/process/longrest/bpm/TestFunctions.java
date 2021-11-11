@@ -15,9 +15,24 @@
  */
 package org.jbpm.process.longrest.bpm;
 
+import java.util.Collections;
+import java.util.Map;
+import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.jbpm.process.longrest.SystemVariables;
+import org.jbpm.process.longrest.demoservices.dto.BuildRequest;
+import org.jbpm.process.longrest.demoservices.dto.CompleteRequest;
+import org.jbpm.process.longrest.demoservices.dto.PreBuildRequest;
+import org.jbpm.process.longrest.demoservices.dto.Request;
+import org.jbpm.process.longrest.demoservices.dto.Scm;
+import org.jbpm.process.longrest.util.Json;
+import org.jbpm.process.longrest.util.ProcessUtils;
 import org.kie.api.runtime.process.ProcessContext;
 
 /**
@@ -32,51 +47,101 @@ public class TestFunctions implements java.io.Serializable {
 
     public static boolean addHeartBeatToRequest = false;
 
-    public String getPreBuildTemplate() {
-        String template = "{  "
-                + "   'scm': { "
-                + "      'url': @{quote(input.buildConfiguration.scmRepoURL)}, "
-                + "      'revision': @{quote(input.buildConfiguration.scmRevision)} "
-                + "   }, "
-                + "   'syncEnabled': @{quote(input.buildConfiguration.preBuildSyncEnabled)}, "
-                + "   'callback': { "
-                + "      'url': @{quote(system.callbackUrl)}, "
-                + "      'method': @{quote(system.callbackMethod)} ";
-        if (addHeartBeatToRequest) {
-            template = template
-                    + "   }, "
-                    + "   'heartBeat': { "
-                    + "      'url': @{quote(system.heartBeatUrl)}, "
-                    + "      'method': @{quote(system.heartBeatMethod)} ";
+    private static ObjectMapper mapper = new ObjectMapper();
+
+    public static String getPreBuildTemplate(Map<String, Object> input) {
+        JsonNode rootInput = mapper.valueToTree(input);
+        SystemVariables systemVariables = ProcessUtils.getSystemVariables();
+
+        PreBuildRequest preBuildRequest = new PreBuildRequest();
+        preBuildRequest.setScm(new Scm(
+                getString(rootInput, "/buildConfiguration/scmRepoURL").get(),
+                getString(rootInput, "/buildConfiguration/scmRevision").get()
+        ));
+        preBuildRequest.setSyncEnabled(getBoolean(rootInput, "/buildConfiguration/preBuildSyncEnabled").orElse(false));
+        preBuildRequest.setCallback(new Request(
+                systemVariables.getCallbackUrl(),
+                systemVariables.getCallbackMethod()
+        ));
+        if (addHeartBeatToRequest) { //TODO test without heartbeat executor
+            preBuildRequest.setHeartBeat(new Request(
+                    systemVariables.getHeartBeatUrl(),
+                    systemVariables.getHeartBeatMethod()
+            ));
         }
-        template = template + "   } "
-                + "}";
-        return template.replace("'", "\"");
+        try {
+            return mapper.writeValueAsString(preBuildRequest);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to prepare pre-build template.", e);
+        }
     }
 
-    public String getBuildTemplate() {
-        return ("{  "
-                + "   'buildScript': @{quote(input.buildConfiguration.buildScript)}, "
-                + "   'scm': { "
-                + "      'url': @{quote(preBuildResult.response.scm.url)}, "
-                + "      'revision': @{quote(preBuildResult.response.scm.revision)} "
-                + "   }, "
-                + "   'callback': { "
-                + "      'url': @{quote(system.callbackUrl)}, "
-                + "      'method': @{quote(system.callbackMethod)} "
-                + "   } "
-                + "}").replace("'", "\"");
+    public String getBuildTemplate(Map<String, Object> input, Map<String, Object> preBuildResult) {
+        JsonNode rootInput = mapper.valueToTree(input);
+        JsonNode rootPreBuildResult = mapper.valueToTree(preBuildResult);
+        SystemVariables systemVariables = ProcessUtils.getSystemVariables();
+
+        BuildRequest buildRequest = new BuildRequest();
+        buildRequest.setBuildScript(getString(rootInput, "/buildConfiguration/buildScript").get());
+        buildRequest.setScm(new Scm(
+                getString(rootPreBuildResult, "/response/scm/url").get(),
+                getString(rootPreBuildResult, "/response/scm/url").get()
+        ));
+        buildRequest.setCallback(new Request(
+                systemVariables.getCallbackUrl(),
+                systemVariables.getCallbackMethod()
+        ));
+
+        try {
+            return mapper.writeValueAsString(buildRequest);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to prepare pre-build template.", e);
+        }
+    }
+
+    public static String getCancelTemplate(Map<String, Object> _preBuildResponse) {
+        try {
+            if (_preBuildResponse == null) {
+                throw new RuntimeException("Unable to prepare build cancel template. Empty response.");
+            }
+            return mapper.writeValueAsString(_preBuildResponse.get("attachment"));
+        } catch (Throwable e) {
+            String msg = "Unable to prepare build cancel template.";
+            logger.severe(msg + ":" + e.getMessage());
+            throw new RuntimeException(msg, e);
+        }
+    }
+
+    public String getCompletionTemplate(Map<String, Object> input, Map<String, Object> preBuildResult, Map<String, Object> buildResult) {
+        JsonNode rootInput = mapper.valueToTree(input);
+        JsonNode rootPreBuildResult = mapper.valueToTree(preBuildResult);
+        JsonNode rootBuildResult = mapper.valueToTree(buildResult);
+
+        CompleteRequest completeRequest = new CompleteRequest();
+        completeRequest.setBuildConfigurationId(getString(rootInput, "/buildConfiguration/id").get());
+        completeRequest.setScm(this.<Scm>getObject(rootPreBuildResult, "/scm").orElse(null));
+        completeRequest.setCompletionStatus(getCompletionStatus(
+                getString(rootPreBuildResult, "/status").orElse(null),
+                getString(rootBuildResult, "/status").orElse(null)
+        ).name());
+        completeRequest.setLabels(getMap(rootInput, "/buildConfiguration/labels"));
+
+        try {
+            return mapper.writeValueAsString(completeRequest);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to prepare pre-build template.", e);
+        }
     }
 
     public String getCompletionTemplate() {
         return ("{ "
-                + "   'buildConfigurationId': @{quote(input.buildConfiguration.id)}, "
+                + "   'buildConfigurationId': @{quote(#{input.buildConfiguration.id})}, "
                 + "   'scm': { "
-                + "      'url': @{quote(preBuildResult.?response.?scm.url)}, "
-                + "      'revision': @{quote(preBuildResult.?response.?scm.revision)} "
+                + "      'url': @{quote(#{preBuildResult.?response.?scm.url})}, "
+                + "      'revision': @{quote(#{preBuildResult.?response.?scm.revision})} "
                 + "   }, "
-                + "   'completionStatus': '@{functions.getCompletionStatus(preBuildResult.?status, ?buildResult.?status)}', "
-                + "   'labels': @{asJson(input.buildConfiguration.labels, true)} "
+                + "   'completionStatus': '#{functions.getCompletionStatus(#{preBuildResult.?status}, #{?buildResult.?status})}', "
+                + "   'labels': @{asJson(#{input.buildConfiguration.labels}, true)} "
                 + "}").replace("'", "\"");
     }
 
@@ -85,6 +150,45 @@ public class TestFunctions implements java.io.Serializable {
 
     public static void logInfo(ProcessContext kcontext, String msg) {
         logger.info("Process: " + kcontext.getProcessInstance().getProcessName() + " id: " + kcontext.getProcessInstance().getId() + " ; " + msg);
+    }
+
+    @Deprecated
+    public static Optional<String> getString(JsonNode root, String path) {
+        JsonNode node = root.at(path);
+        if (node.isMissingNode()) {
+            return Optional.empty();
+        } else {
+            return Optional.of(node.asText());
+        }
+    }
+
+    @Deprecated
+    public static Optional<Boolean> getBoolean(JsonNode root, String path) {
+        JsonNode node = root.at(path);
+        if (node.isMissingNode()) {
+            return Optional.empty();
+        } else {
+            return Optional.of(node.asBoolean());
+        }
+    }
+
+    public static <K,V>Map<K, V> getMap(JsonNode root, String path) {
+        JsonNode mapNode = root.at(path);
+        if (mapNode.isMissingNode()) {
+            return Collections.emptyMap();
+        } else {
+            Map<K, V> map = mapper.convertValue(mapNode, new TypeReference<Map<K, V>>() {});
+            return Json.unescape(map);
+        }
+    }
+
+    public static <T> Optional<T> getObject(JsonNode root, String path) {
+        JsonNode mapNode = root.at(path);
+        if (mapNode.isMissingNode()) {
+            return Optional.empty();
+        } else {
+            return Optional.of(mapper.convertValue(mapNode, new TypeReference<T>(){}));
+        }
     }
 
     public static ProcessCompletionStatus getCompletionStatus(

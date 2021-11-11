@@ -132,6 +132,7 @@ public class Service {
             String cancelUrl = "http://localhost:8080/demo-service/cancel/" + jobId;
             cancelUrl += "?delay=" + cancelDelay;
             response.put("cancelUrl", cancelUrl);
+            response.put("attachment", Collections.singletonMap("preBuildAttKey", "attVal"));
         }
         return Response.status(200)
                 .header("Set-Cookie", PRE_BUILD_COOKIE_NAME + "=" + PRE_BUILD_COOKIE_VALUE)
@@ -157,7 +158,7 @@ public class Service {
         String cancelUrl = "http://localhost:8080/demo-service/cancel/" + jobId;
         Map<String, Object> response = new HashMap<>();
         response.put("cancelUrl", cancelUrl);
-
+        response.put("attachment", Collections.singletonMap("attKey", "attVal"));
         return Response.status(200).entity(response).build();
     }
 
@@ -176,6 +177,7 @@ public class Service {
     public Response cancelAction(
             @PathParam("id") int jobId,
             @QueryParam("delay") @DefaultValue("1") int delay,
+            Map<String, Object> attachment,
             @Context HttpHeaders httpHeaders) {
         logger.info("> Action Cancel requested for job:" + jobId);
 
@@ -186,6 +188,7 @@ public class Service {
 
         Map<String, Object> result = new HashMap<>();
         result.put("cancelled", "true");
+        result.put("attachment", attachment);
 
         scheduleCallback(runningJob.callbackUrl, "POST", null, delay, result);
 
@@ -203,8 +206,8 @@ public class Service {
 
     private ScheduledFuture<?> startHeartBeat(String url) {
         ServiceListener serviceListener = serviceListener();
-        ScheduledFuture<?> future = executorService.scheduleAtFixedRate(()
-                                                                                -> executeRequest(url, "POST", Collections.emptyList(), null, serviceListener), 300L, 300L, TimeUnit.MILLISECONDS);
+        Runnable sendBeat = () -> executeRequest(url, "POST", Collections.emptyList(), null, serviceListener);
+        ScheduledFuture<?> future = executorService.scheduleAtFixedRate(sendBeat, 300L, 300L, TimeUnit.MILLISECONDS);
         return future;
     }
 
