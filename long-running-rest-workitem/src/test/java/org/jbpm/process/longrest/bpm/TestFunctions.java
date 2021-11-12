@@ -99,7 +99,7 @@ public class TestFunctions implements java.io.Serializable {
         }
     }
 
-    public static String getCancelTemplate(Map<String, Object> _preBuildResponse) {
+    public String getPreBuildCancelRequest(Map<String, Object> _preBuildResponse) {
         try {
             if (_preBuildResponse == null) {
                 throw new RuntimeException("Unable to prepare build cancel template. Empty response.");

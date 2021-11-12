@@ -11,8 +11,12 @@
   </parent>
 
   <artifactId>long-running-rest-workitem</artifactId>
+  <version>7.52.0.pnc-0001-SNAPSHOT</version>
   <name>Long Running REST</name>
   <description>Workitem for invoking long-running REST tasks with callback</description>
+  <properties>
+    <version.org.kie>${project.parent.version}</version.org.kie>
+  </properties>
 
   <dependencyManagement>
     <dependencies>
@@ -25,6 +29,61 @@
         <groupId>org.apache.commons</groupId>
         <artifactId>commons-text</artifactId>
         <version>1.9</version>
+      </dependency>
+      <!-- use parent versions -->
+      <dependency>
+        <groupId>org.drools</groupId>
+        <artifactId>drools-core</artifactId>
+      </dependency>
+      <dependency>
+        <groupId>org.jbpm</groupId>
+        <artifactId>jbpm-document</artifactId>
+        <version>${project.parent.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jbpm</groupId>
+        <artifactId>jbpm-workitems-core</artifactId>
+        <version>${project.parent.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jbpm</groupId>
+        <artifactId>jbpm-flow</artifactId>
+        <version>${project.parent.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jbpm</groupId>
+        <artifactId>jbpm-test</artifactId>
+        <version>${project.parent.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jbpm</groupId>
+        <artifactId>jbpm-workitems-core</artifactId>
+        <version>${project.parent.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jbpm</groupId>
+        <artifactId>jbpm-test-util</artifactId>
+        <version>${project.parent.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jbpm.contrib</groupId>
+        <artifactId>template-resources</artifactId>
+        <version>${project.parent.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.kie</groupId>
+        <artifactId>narayana-integration-bom</artifactId>
+        <type>pom</type>
+        <version>${project.parent.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.kie</groupId>
+        <artifactId>kie-api</artifactId>
+        <version>${project.parent.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.kie</groupId>
+        <artifactId>kie-internal</artifactId>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -224,7 +283,7 @@
         <version>1.5</version>
         <configuration>
           <resourceBundles>
-            <resourceBundle>${project.groupId}:template-resources:${project.version}</resourceBundle>
+            <resourceBundle>${project.groupId}:template-resources:${project.parent.version}</resourceBundle>
           </resourceBundles>
         </configuration>
         <executions>

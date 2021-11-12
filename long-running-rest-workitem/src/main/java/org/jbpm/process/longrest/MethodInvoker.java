@@ -16,7 +16,6 @@
 package org.jbpm.process.longrest;
 
 import java.io.Serializable;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.logging.Level;
@@ -29,26 +28,22 @@ public class MethodInvoker implements Serializable {
 
     public static final Logger logger = Logger.getLogger(MethodInvoker.class.getName());
 
-    public static String prepareTemplate(String templateMethod, Map<String, Object> restResponse) {
-        if (templateMethod == null) {
+    public static String withRestResponse(Serializable objectInstance, String methodName, Map<String, Object> restResponse) {
+        if (objectInstance == null || methodName == null) {
             return null;
         }
         try {
-            int methodStartPos = templateMethod.lastIndexOf('.');
-            String templateClassName = templateMethod.substring(0, methodStartPos);
-            String templateMethodName = templateMethod.substring(methodStartPos + 1);
-
-            Class<?> templClass = Class.forName(templateClassName);
-            Method method = templClass.getMethod(templateMethodName, Map.class);
-            Object template = method.invoke(null, restResponse);
-            logger.log(Level.INFO, "Cancel template: " + template); //TODO lower log level
-            if (template != null) {
-                return (String) template;
+            Class<?> objectClass = objectInstance.getClass();
+            Method method = objectClass.getMethod(methodName, Map.class);
+            Object result = method.invoke(objectInstance, restResponse);
+            logger.log(Level.FINE, "Result from withRestResponse: " + result);
+            if (result != null) {
+                return (String) result;
             } else {
                 return null;
             }
-        } catch (NoSuchMethodException | IllegalAccessException | ClassNotFoundException | InvocationTargetException e) {
-            logger.severe("Unable to invoke method. " + e.getMessage());
+        } catch (Throwable e) {
+            logger.log(Level.SEVERE, "Unable to invoke method. ", e);
             throw new RuntimeException(e);
         }
     }

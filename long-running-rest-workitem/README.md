@@ -55,14 +55,6 @@ For an example see `org.jbpm.contrib.longrest.bpm.TestFunctions.getPreBuildTempl
 - heartBeatUrl
 - heartBeatMethod
 
-**Including whole object map**
-Note that all values are stored as nested maps, 
-to include the whole object in the template you have to serialize it and to unescape it, to prevent double json escape.
-#TODO update the doc, this has been removed
-Use `org.jbpm.contrib.longrest.util.Mapper().writeValueAsString(object, true)` to unescape the serialized object.
-See `org.jbpm.contrib.longrest.bpm.TestFunctions.getCompletionTemplate()`.
-
-
 Task Result
 ===========
 Based on the result of a `successEvalTemplate` the task exits normally or exceptionally.
