@@ -1,7 +1,5 @@
 <?xml version="1.0"?>
-<project
-    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
-    xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
@@ -12,7 +10,7 @@
 
   <groupId>org.jboss.pnc.bpm.workitems</groupId>
   <artifactId>long-running-rest-workitem</artifactId>
-  <version>7.52.0-SNAPSHOT</version>
+  <version>7.52.0</version>
   <name>Long Running REST</name>
   <description>Workitem for invoking long-running REST tasks with callback</description>
   <properties>
@@ -23,7 +21,7 @@
     <connection>scm:git:https://github.com/project-ncl/jbpm-work-items.git</connection>
     <developerConnection>scm:git:git@github.com:project-ncl/jbpm-work-items.git</developerConnection>
     <url>https://github.com/project-ncl/jbpm-work-items</url>
-    <tag>HEAD</tag>
+    <tag>7.52.0.Pnc</tag>
   </scm>
 
   <dependencyManagement>
