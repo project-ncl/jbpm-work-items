@@ -231,15 +231,10 @@ public class LongRunningRestServiceWorkItemHandler extends AbstractLogOrThrowWor
         int statusCode = httpResponse.getStatusLine().getStatusCode();
         logger.info("Remote endpoint returned status: {}.", statusCode);
 
-        if (statusCode < 200 || statusCode >= 300) {
-            String message = MessageFormat.format("Remote service responded with error status code {0} and reason: {1}. ProcessInstanceId {2}.", statusCode, httpResponse.getStatusLine().getReasonPhrase(), processInstance.getId());
-            throw new FailedResponseException(message, statusCode);
-        }
-
         storeCookies(httpResponse, processInstance);
 
         HttpEntity responseEntity = httpResponse.getEntity();
-        if (statusCode == 204 || responseEntity.getContentLength() == 0L) {
+        if (statusCode == 204 || responseEntity == null || responseEntity.getContentLength() == 0L) {
             completeWorkItem(manager, workItemId, statusCode, Collections.emptyMap(), "");
         } else {
             String responseString;
@@ -262,15 +257,19 @@ public class LongRunningRestServiceWorkItemHandler extends AbstractLogOrThrowWor
                         serviceInvocationResponse.put(Integer.toString(i), array[i]);
                     }
                 } else {
-                    serviceInvocationResponse = Mapper.getInstance()
-                            .convertValue(root, new TypeReference<Map<String, Object>>() {
-                            });
+                    serviceInvocationResponse = Mapper.getInstance().convertValue(root, new TypeReference<Map<String, Object>>() {});
                 }
             } catch (Exception e) {
-                String message = MessageFormat.format("Cannot parse service invocation response. ProcessInstanceId {0}.",
-                                                      processInstance.getId());
+                String message = MessageFormat.format("Cannot parse service invocation response. ProcessInstanceId {0}.", processInstance.getId());
                 throw new ResponseProcessingException(message, e);
             }
+
+            if (statusCode < 200 || statusCode >= 300) {
+                logger.warn("Remote service responded with error status code {} and reason: {}. ProcessInstanceId {}.", statusCode, httpResponse.getStatusLine().getReasonPhrase(), processInstance.getId());
+                completeWorkItemWithFailedResponse(manager, workItemId, statusCode, serviceInvocationResponse, new FailedResponseException(httpResponse.getStatusLine().getReasonPhrase(), statusCode));
+                return;
+            }
+
             String cancelUrl = "";
             try {
                 if (!Strings.isEmpty(cancelUrlTemplate)) {
@@ -362,7 +361,7 @@ public class LongRunningRestServiceWorkItemHandler extends AbstractLogOrThrowWor
                 responseCode,
                 serviceInvocationResult,
                 cancelUrl,
-                Optional.empty());
+                null);
     }
 
     private void completeWorkItem(WorkItemManager manager, long workItemId, Throwable cause) {
@@ -372,8 +371,18 @@ public class LongRunningRestServiceWorkItemHandler extends AbstractLogOrThrowWor
                 -1,
                 Collections.emptyMap(),
                 "",
-                Optional.ofNullable(cause));
+                cause);
     }
+
+    private void completeWorkItemWithFailedResponse(WorkItemManager manager, long workItemId, int statusCode, Map<String, Object> response, FailedResponseException e) {
+        completeWorkItem(
+                manager,
+                workItemId,
+                statusCode,
+                response,
+                "",
+                e);
+   }
 
     private void completeWorkItem(
             WorkItemManager manager,
@@ -381,14 +390,14 @@ public class LongRunningRestServiceWorkItemHandler extends AbstractLogOrThrowWor
             int responseCode,
             Map<String, Object> serviceInvocationResult,
             String cancelUrl,
-            Optional<Throwable> cause) {
+            Throwable cause) {
         Map<String, Object> results = new HashMap<>();
         results.put("responseCode", responseCode);
         results.put("result", serviceInvocationResult);
         results.put("cancelUrl", cancelUrl);
-        cause.ifPresent(c -> {
-            results.put("error", c);
-        });
+        if (cause != null) {
+            results.put("error", cause);
+        }
         logger.info("Rest service workitem completion result {}.", results);
         manager.completeWorkItem(workItemId, results);
     }
