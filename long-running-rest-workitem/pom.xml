@@ -10,13 +10,21 @@
     <version>7.52.0.Final</version>
   </parent>
 
+  <groupId>org.jboss.pnc.bpm.workitems</groupId>
   <artifactId>long-running-rest-workitem</artifactId>
-  <version>7.52.0.pnc-0001-SNAPSHOT</version>
+  <version>7.52.0-SNAPSHOT</version>
   <name>Long Running REST</name>
   <description>Workitem for invoking long-running REST tasks with callback</description>
   <properties>
     <version.org.kie>${project.parent.version}</version.org.kie>
   </properties>
+
+  <scm>
+    <connection>scm:git:https://github.com/project-ncl/jbpm-work-items.git</connection>
+    <developerConnection>scm:git:git@github.com:project-ncl/jbpm-work-items.git</developerConnection>
+    <url>https://github.com/project-ncl/jbpm-work-items</url>
+    <tag>HEAD</tag>
+  </scm>
 
   <dependencyManagement>
     <dependencies>
@@ -53,11 +61,6 @@
       <dependency>
         <groupId>org.jbpm</groupId>
         <artifactId>jbpm-test</artifactId>
-        <version>${project.parent.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.jbpm</groupId>
-        <artifactId>jbpm-workitems-core</artifactId>
         <version>${project.parent.version}</version>
       </dependency>
       <dependency>
@@ -151,7 +154,7 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>${project.groupId}</groupId>
+      <groupId>${project.parent.groupId}</groupId>
       <artifactId>template-resources</artifactId>
       <scope>provided</scope>
     </dependency>
@@ -172,6 +175,13 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+
+  <distributionManagement>
+      <snapshotRepository>
+          <id>ossrh</id>
+          <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+      </snapshotRepository>
+  </distributionManagement>
 
   <build>
     <sourceDirectory>${project.build.directory}/generated-sources/java</sourceDirectory>
@@ -283,7 +293,7 @@
         <version>1.5</version>
         <configuration>
           <resourceBundles>
-            <resourceBundle>${project.groupId}:template-resources:${project.parent.version}</resourceBundle>
+            <resourceBundle>${project.parent.groupId}:template-resources:${project.parent.version}</resourceBundle>
           </resourceBundles>
         </configuration>
         <executions>
@@ -324,7 +334,68 @@
           </execution>
         </executions>
       </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-release-plugin</artifactId>
+        <configuration>
+          <tagNameFormat>@{project.version}.Pnc</tagNameFormat>
+          <autoVersionSubmodules>true</autoVersionSubmodules>
+          <useReleaseProfile>false</useReleaseProfile>
+          <releaseProfiles>release</releaseProfiles>
+          <stagingRepository>https://oss.sonatype.org/service/local/staging/deploy/maven2/</stagingRepository>
+          <goals>deploy</goals>
+          <!-- disabled in the parent -->
+          <pushChanges>true</pushChanges>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.sonatype.plugins</groupId>
+        <artifactId>nexus-staging-maven-plugin</artifactId>
+        <version>1.6.8</version>
+        <extensions>true</extensions>
+        <configuration>
+          <serverId>ossrh</serverId>
+          <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+          <autoReleaseAfterClose>false</autoReleaseAfterClose>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 
+  <profiles>
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-source-plugin</artifactId>
+            <version>3.2.1</version>
+            <executions>
+              <execution>
+                <id>attach-sources</id>
+                <goals>
+                  <goal>jar-no-fork</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>1.6</version>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>
