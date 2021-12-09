@@ -138,9 +138,9 @@ public class LongRunningRestServiceWorkItemHandler extends AbstractLogOrThrowWor
             String requestMethod = ProcessUtils.getParameter(workItem, "method", "");
             String requestTemplate = ProcessUtils.getParameter(workItem, "template", "");
             String requestHeaders = ProcessUtils.getParameter(workItem, "headers", "");
-            int socketTimeout = ProcessUtils.getParameter(workItem, "socketTimeout", 5000);
+            int socketTimeout = ProcessUtils.getParameter(workItem, "socketTimeout", 30000);
             int connectTimeout = ProcessUtils.getParameter(workItem, "connectTimeout", 5000);
-            int connectionRequestTimeout = ProcessUtils.getParameter(workItem, "connectionRequestTimeout", 5000);
+            int connectionRequestTimeout = ProcessUtils.getParameter(workItem, "connectionRequestTimeout", 0);
 
 
             //should this service run
