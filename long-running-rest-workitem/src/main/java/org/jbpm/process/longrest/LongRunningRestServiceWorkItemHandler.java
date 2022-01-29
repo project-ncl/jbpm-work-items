@@ -15,34 +15,12 @@
  */
 package org.jbpm.process.longrest;
 
-import java.io.IOException;
-import java.net.HttpCookie;
 import java.text.MessageFormat;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.JsonNodeType;
-import org.apache.commons.text.StringSubstitutor;
-import org.apache.http.Header;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.RequestBuilder;
-import org.apache.http.entity.ContentType;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.util.EntityUtils;
-import org.jbpm.process.longrest.util.Mapper;
 import org.jbpm.process.longrest.util.ProcessUtils;
-import org.jbpm.process.longrest.util.Strings;
 import org.jbpm.process.workitem.core.AbstractLogOrThrowWorkItemHandler;
 import org.jbpm.process.workitem.core.util.RequiredParameterValidator;
 import org.jbpm.process.workitem.core.util.Wid;
@@ -61,9 +39,6 @@ import org.kie.api.runtime.process.WorkflowProcessInstance;
 import org.kie.internal.runtime.manager.context.ProcessInstanceIdContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.jbpm.process.longrest.Constant.CONTAINER_ID_VARIABLE;
-import static org.jbpm.process.longrest.Constant.PROCESS_INSTANCE_ID_VARIABLE;
 
 @Wid(widfile = "LongRunningRestService.wid",
         name = "LongRunningRestService",
@@ -142,25 +117,29 @@ public class LongRunningRestServiceWorkItemHandler extends AbstractLogOrThrowWor
             int connectTimeout = ProcessUtils.getParameter(workItem, "connectTimeout", 5000);
             int connectionRequestTimeout = ProcessUtils.getParameter(workItem, "connectionRequestTimeout", 0);
 
-
-            //should this service run
-            logger.debug("Should run ProcessInstance.id: {}.", processInstance.getId());
+            RemoteInvoker remoteInvoker = new RemoteInvoker(
+                    containerId,
+                    processInstanceId,
+                    socketTimeout,
+                    connectTimeout,
+                    connectionRequestTimeout);
 
             try {
-                invokeRemoteService(
-                        processInstance,
-                        manager,
-                        workItem.getId(),
-                        requestUrl,
+                RemoteInvocationResult result = remoteInvoker.invoke(
                         requestMethod,
+                        requestUrl,
                         requestTemplate,
-                        containerId,
                         cancelUrlJsonPointer,
                         cancelUrlTemplate,
                         requestHeaders,
-                        socketTimeout,
-                        connectTimeout,
-                        connectionRequestTimeout);
+                        (Map<String, String>) processInstance.getVariable(COOKIES_KEY)
+                );
+                processInstance.setVariable(COOKIES_KEY, result.getResponseCookies());
+                if (result.getErrorCause() == null) {
+                    completeWorkItem(manager, workItem.getId(), result.getResponseCode(), result.getServiceInvocationResult(), result.getCancelUrl());
+                } else {
+                    completeWorkItemWithFailedResponse(manager, workItem.getId(), result.getResponseCode(), result.getServiceInvocationResult(), result.getErrorCause());
+                }
             } catch (RemoteInvocationException e) {
                 String message = MessageFormat.format("Failed to invoke remote service. ProcessInstanceId {0}.", processInstanceId);
                 logger.warn(message, e);
@@ -169,180 +148,11 @@ public class LongRunningRestServiceWorkItemHandler extends AbstractLogOrThrowWor
                 String message = MessageFormat.format("Failed to process response. ProcessInstanceId {0}.", processInstanceId);
                 logger.warn(message, e);
                 completeWorkItem(manager, workItem.getId(), e);
-            } catch (FailedResponseException e) {
-                String message = MessageFormat.format("Response failed with status {1}. ProcessInstanceId {0}.", processInstanceId, e.getStatusCode());
-                logger.warn(message, e);
-                completeWorkItem(manager, workItem.getId(), e);
             }
         } catch (Throwable cause) {
             logger.error("Failed to execute workitem handler due to the following error.", cause);
             completeWorkItem(manager, workItem.getId(), cause);
         }
-    }
-
-    private void invokeRemoteService(
-            WorkflowProcessInstance processInstance,
-            WorkItemManager manager,
-            long workItemId,
-            String requestUrl,
-            String httpMethod,
-            String requestTemplate,
-            String containerId,
-            String cancelUrlJsonPointer,
-            String cancelUrlTemplate,
-            String requestHeaders,
-            int socketTimeout,
-            int connectTimeout,
-            int connectionRequestTimeout) throws RemoteInvocationException, ResponseProcessingException, FailedResponseException {
-
-        logger.debug("requestTemplate: {}", requestTemplate);
-
-        Map<String, Object> variables = new HashMap<>();
-        variables.put(PROCESS_INSTANCE_ID_VARIABLE, processInstance.getId());
-        variables.put(CONTAINER_ID_VARIABLE, containerId);
-        StringSubstitutor sub = new StringSubstitutor(variables, "$(", ")");
-
-        String requestBodyEvaluated;
-        if (requestTemplate != null && !requestTemplate.equals("")) {
-            requestBodyEvaluated = sub.replace(requestTemplate);
-        } else {
-            requestBodyEvaluated = "";
-        }
-
-        Map<String, String> requestHeadersMap = new HashMap<>();
-        // Add cookies to the request
-        Map<String, String> cookies = (Map<String, String>) processInstance.getVariable(COOKIES_KEY);
-        if (cookies != null) {
-            String cookieHeader = cookies.entrySet().stream()
-                    .map(c -> c.getKey() + "=" + c.getValue())
-                    .collect(Collectors.joining("; "));
-            requestHeadersMap.put("Cookie", cookieHeader);
-        }
-        requestHeadersMap.putAll(Strings.toMap(requestHeaders));
-        HttpResponse httpResponse = httpRequest(
-                requestUrl,
-                requestBodyEvaluated,
-                httpMethod,
-                requestHeadersMap,
-                socketTimeout,
-                connectTimeout,
-                connectionRequestTimeout);
-
-        int statusCode = httpResponse.getStatusLine().getStatusCode();
-        logger.info("Remote endpoint returned status: {}.", statusCode);
-
-        storeCookies(httpResponse, processInstance);
-
-        HttpEntity responseEntity = httpResponse.getEntity();
-        if (statusCode == 204 || responseEntity == null || responseEntity.getContentLength() == 0L) {
-            completeWorkItem(manager, workItemId, statusCode, Collections.emptyMap(), "");
-        } else {
-            String responseString;
-            try {
-                responseString = EntityUtils.toString(responseEntity, "UTF-8");
-                logger.debug("Invocation response: {}", responseString);
-            } catch (IOException e) {
-                throw new ResponseProcessingException("Cannot read remote entity.", e);
-            }
-            JsonNode root;
-            Map<String, Object> serviceInvocationResponse;
-            try {
-                root = Mapper.getInstance().readTree(responseString);
-                if (JsonNodeType.ARRAY.equals(root.getNodeType())) {
-                    //convert array to indexed map
-                    serviceInvocationResponse = new LinkedHashMap<>();
-                    Object[] array = Mapper.getInstance().convertValue(root, new TypeReference<Object[]>() {
-                    });
-                    for (int i = 0; i < array.length; i++) {
-                        serviceInvocationResponse.put(Integer.toString(i), array[i]);
-                    }
-                } else {
-                    serviceInvocationResponse = Mapper.getInstance().convertValue(root, new TypeReference<Map<String, Object>>() {});
-                }
-            } catch (Exception e) {
-                String message = MessageFormat.format("Cannot parse service invocation response. ProcessInstanceId {0}.", processInstance.getId());
-                throw new ResponseProcessingException(message, e);
-            }
-
-            if (statusCode < 200 || statusCode >= 300) {
-                logger.warn("Remote service responded with error status code {} and reason: {}. ProcessInstanceId {}.", statusCode, httpResponse.getStatusLine().getReasonPhrase(), processInstance.getId());
-                completeWorkItemWithFailedResponse(manager, workItemId, statusCode, serviceInvocationResponse, new FailedResponseException(httpResponse.getStatusLine().getReasonPhrase(), statusCode));
-                return;
-            }
-
-            String cancelUrl = "";
-            try {
-                if (!Strings.isEmpty(cancelUrlTemplate)) {
-                    logger.debug("Setting cancel url from template: {}.", cancelUrlTemplate);
-                    cancelUrl = cancelUrlTemplate;
-                } else if (!Strings.isEmpty(cancelUrlJsonPointer)) {
-                    logger.debug("Setting cancel url from json pointer: {}.", cancelUrlJsonPointer);
-                    JsonNode cancelUrlNode = root.at(cancelUrlJsonPointer);
-                    if (!cancelUrlNode.isMissingNode()) {
-                        cancelUrl = cancelUrlNode.asText();
-                    }
-                }
-                logger.debug("Cancel url: {}.", cancelUrl);
-            } catch (Exception e) {
-                String message = MessageFormat.format("Cannot read cancel url from service invocation response. ProcessInstanceId {0}.", processInstance.getId());
-                throw new ResponseProcessingException(message, e);
-            }
-            completeWorkItem(manager, workItemId, statusCode, serviceInvocationResponse, cancelUrl);
-        }
-    }
-
-    private void storeCookies(HttpResponse response, WorkflowProcessInstance processInstance) {
-        Map<String, String> cookies = new HashMap<>();
-        Header[] cookieHeaders = response.getHeaders("Set-Cookie");
-        for (Header cookieHeader : cookieHeaders) {
-            List<HttpCookie> cookiesInTheHeader = HttpCookie.parse(cookieHeader.getValue());
-            Map<String, String> cookiesMap = cookiesInTheHeader.stream()
-                    .collect(Collectors.toMap(HttpCookie::getName, HttpCookie::getValue));
-            cookies.putAll(cookiesMap);
-        }
-        processInstance.setVariable(COOKIES_KEY, cookies);
-    }
-
-    private HttpResponse httpRequest(
-            String url,
-            String jsonContent,
-            String httpMethod,
-            Map<String, String> requestHeaders,
-            int socketTimeout,
-            int connectTimeout,
-            int connectionRequestTimeout) throws RemoteInvocationException {
-        RequestConfig config = RequestConfig.custom()
-                .setSocketTimeout(socketTimeout)
-                .setConnectTimeout(connectTimeout)
-                .setConnectionRequestTimeout(connectionRequestTimeout)
-                .build();
-
-        HttpClientBuilder clientBuilder = HttpClientBuilder.create()
-                .setDefaultRequestConfig(config);
-
-        HttpClient httpClient = clientBuilder.build();
-
-        RequestBuilder requestBuilder = RequestBuilder.create(httpMethod).setUri(url);
-
-        if (requestHeaders != null) {
-            requestHeaders.forEach((k, v) -> requestBuilder.addHeader(k, v));
-        }
-
-        if (jsonContent != null && !jsonContent.equals("")) {
-            requestBuilder.setHeader("Content-Type", "application/json");
-            StringEntity entity = new StringEntity(jsonContent, ContentType.APPLICATION_JSON);
-            requestBuilder.setEntity(entity);
-        }
-
-        logger.info("Invoking remote endpoint {} {} Headers: {} Body: {}.", httpMethod, url, requestHeaders, jsonContent);
-
-        HttpResponse httpResponse;
-        try {
-            httpResponse = httpClient.execute(requestBuilder.build());
-        } catch (IOException e) {
-            throw new RemoteInvocationException("Unable to invoke remote endpoint.", e);
-        }
-        return httpResponse;
     }
 
     /**

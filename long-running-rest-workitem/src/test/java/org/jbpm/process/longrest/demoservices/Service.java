@@ -96,8 +96,33 @@ public class Service {
     public Response test() {
         Map<String, Object> response = new HashMap<>();
         response.put("time", new Date());
-
         return Response.status(200).entity(response).build();
+    }
+
+    @GET
+    @Path("/200-empty")
+    public Response empty200() {
+        return Response.status(200).build();
+    }
+
+    @GET
+    @Path("/204")
+    public Response empty204() {
+        return Response.status(204).build();
+    }
+
+    @GET
+    @Path("/404")
+    public Response page404() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("time", new Date());
+        return Response.status(404).entity(response).build();
+    }
+
+    @GET
+    @Path("/404-empty")
+    public Response empty404() {
+        return Response.status(404).build();
     }
 
     @POST

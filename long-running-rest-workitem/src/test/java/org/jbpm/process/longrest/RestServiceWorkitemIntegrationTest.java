@@ -68,7 +68,7 @@ public class RestServiceWorkitemIntegrationTest extends JbpmJUnitBaseTestCase {
     private final Logger logger = LoggerFactory.getLogger(RestServiceWorkitemIntegrationTest.class);
 
     private static int PORT = 8080;
-    private static String DEFAULT_HOST = "localhost";
+    private static String HOST = "localhost";
     private UndertowJaxrsServer server;
 
     private ObjectMapper objectMapper = new ObjectMapper();
@@ -83,7 +83,7 @@ public class RestServiceWorkitemIntegrationTest extends JbpmJUnitBaseTestCase {
 
     @Before
     public void preTestSetup() throws Exception {
-        System.setProperty(Constant.HOSTNAME_HTTP, "localhost:8080");
+        System.setProperty(Constant.HOSTNAME_HTTP, hostPort());
 
         // Configure jBPM server with all the test processes, workitems and event listeners.
         setupPoolingDataSource();
@@ -121,7 +121,7 @@ public class RestServiceWorkitemIntegrationTest extends JbpmJUnitBaseTestCase {
         deploymentInfo.addServletContextAttribute(WorkItems.RUNTIME_MANAGER_KEY, manager);
 
         server.deploy(deploymentInfo);
-        Undertow.Builder builder = Undertow.builder().addHttpListener(PORT, "localhost");
+        Undertow.Builder builder = Undertow.builder().addHttpListener(PORT, HOST);
         server.start(builder);
     }
 
@@ -167,7 +167,7 @@ public class RestServiceWorkitemIntegrationTest extends JbpmJUnitBaseTestCase {
         Map<String, Object> preBuildResponse = Maps.getStringObjectMap(preBuildCallbackResult, "response");
         Assert.assertEquals("new-scm-tag", Maps.getStringObjectMap(preBuildResponse, "scm").get("revision"));
         Map<String, Object> initialResponse = Maps.getStringObjectMap(preBuildCallbackResult, "initialResponse");
-        Assert.assertTrue(initialResponse.get("cancelUrl").toString().startsWith("http://localhost:8080/demo-service/cancel/"));
+        Assert.assertTrue(initialResponse.get("cancelUrl").toString().startsWith("http://" + hostPort() + "/demo-service/cancel/"));
 
         Map<String, Object> buildCallbackResult = (Map<String, Object>) variableChangedQueue.take().getNewValue();
         logger.info("buildCallbackResult: " + buildCallbackResult);
@@ -523,7 +523,7 @@ public class RestServiceWorkitemIntegrationTest extends JbpmJUnitBaseTestCase {
         Map<String, Object> parameters = new HashMap<>();
         parameters.put("requestMethod", "POST");
         parameters.put("requestHeaders", null);
-        parameters.put("requestUrl", "http://localhost:8080/demo-service/prebuild");
+        parameters.put("requestUrl", "http://" + hostPort() + "/demo-service/prebuild");
         parameters.put("requestTemplate", getPreBuildRequestBody());
         parameters.put("taskTimeout", "10");
         parameters.put("cancel", false);
@@ -575,8 +575,8 @@ public class RestServiceWorkitemIntegrationTest extends JbpmJUnitBaseTestCase {
             String heartbeatTimeout,
             Map<String, Object> labels) {
         Map<String, Object> parameters = new HashMap<>();
-        parameters.put("serviceBaseUrl", "http://localhost:8080/demo-service");
-        parameters.put("preBuildServiceUrl", "http://localhost:8080/demo-service/prebuild?"
+        parameters.put("serviceBaseUrl", "http://" + hostPort() + "/demo-service");
+        parameters.put("preBuildServiceUrl", "http://" + hostPort() + "/demo-service/prebuild?"
                 + "callbackDelay=" + preBuildCallbackDelay
                 + "&cancelDelay=" + cancelDelay
                 + "&cancelHeartBeatAfter=" + cancelHeartBeatAfter);
@@ -635,5 +635,9 @@ public class RestServiceWorkitemIntegrationTest extends JbpmJUnitBaseTestCase {
                 return (Map<String, Object>) event.getNewValue();
             }
         }
+    }
+
+    private String hostPort() {
+        return HOST + ":" + PORT;
     }
 }
