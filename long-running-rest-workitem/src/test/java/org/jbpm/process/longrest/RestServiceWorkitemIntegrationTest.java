@@ -48,7 +48,6 @@ import org.jbpm.test.JbpmJUnitBaseTestCase;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.kie.api.event.process.DefaultProcessEventListener;
 import org.kie.api.event.process.ProcessCompletedEvent;
@@ -479,8 +478,7 @@ public class RestServiceWorkitemIntegrationTest extends JbpmJUnitBaseTestCase {
     }
 
     @Test(timeout = 15000)
-    @Ignore //TODO mock HB monitor or test the monitor individually
-    public void shouldFailWhenThereIsNoHeartBeat() throws InterruptedException {
+    public void shouldFailWhenSignalledDied() {
         BlockingQueue<ProcessVariableChangedEvent> variableChangedQueue = new ArrayBlockingQueue(1000);
         ProcessEventListener processEventListener = getProcessEventListener(variableChangedQueue, "preBuildResult");
         customProcessListeners.add(processEventListener);
@@ -498,8 +496,9 @@ public class RestServiceWorkitemIntegrationTest extends JbpmJUnitBaseTestCase {
             //when
             ProcessInstance processInstance = kieSession.startProcess(
                     "testProcess",
-                    Collections.singletonMap("input", getProcessParameters(10, 10, 10, 2, 2, "PT2S", Collections.emptyMap())));
+                    Collections.singletonMap("input", getProcessParameters(10, 10, 10, 2, 1, "PT2S", Collections.emptyMap())));
             manager.disposeRuntimeEngine(runtimeEngine);
+
             //ignore variable initialization
             variableChangedQueue.take();
 
@@ -529,7 +528,6 @@ public class RestServiceWorkitemIntegrationTest extends JbpmJUnitBaseTestCase {
         parameters.put("cancel", false);
         parameters.put("cancelTimeout", null);
         parameters.put("cancelUrlJsonPointer", null);
-        parameters.put("cancelUrlTemplate", null);
         parameters.put("cancelUrlTemplate", null);
         parameters.put("cancelMethod", null);
         parameters.put("cancelHeaders", null);
@@ -563,7 +561,7 @@ public class RestServiceWorkitemIntegrationTest extends JbpmJUnitBaseTestCase {
             int cancelDelay,
             int preBuildCancelTimeout,
             Map<String, Object> labels) {
-        return getProcessParameters(preBuildCallbackDelay, preBuildTimeout, cancelDelay, preBuildCancelTimeout, 10, "", labels);
+        return getProcessParameters(preBuildCallbackDelay, preBuildTimeout, cancelDelay, preBuildCancelTimeout, -1, "", labels);
     }
 
     private Map<String, Object> getProcessParameters(
@@ -571,7 +569,7 @@ public class RestServiceWorkitemIntegrationTest extends JbpmJUnitBaseTestCase {
             int preBuildTimeout,
             int cancelDelay,
             int preBuildCancelTimeout,
-            int cancelHeartBeatAfter,
+            int signalDiedAfter,
             String heartbeatTimeout,
             Map<String, Object> labels) {
         Map<String, Object> parameters = new HashMap<>();
@@ -579,7 +577,7 @@ public class RestServiceWorkitemIntegrationTest extends JbpmJUnitBaseTestCase {
         parameters.put("preBuildServiceUrl", "http://" + hostPort() + "/demo-service/prebuild?"
                 + "callbackDelay=" + preBuildCallbackDelay
                 + "&cancelDelay=" + cancelDelay
-                + "&cancelHeartBeatAfter=" + cancelHeartBeatAfter);
+                + "&signalDiedAfter=" + signalDiedAfter);
         parameters.put("preBuildTimeout", preBuildTimeout);
         parameters.put("preBuildCancelTimeout", preBuildCancelTimeout);
         parameters.put("retryDelay", 0);

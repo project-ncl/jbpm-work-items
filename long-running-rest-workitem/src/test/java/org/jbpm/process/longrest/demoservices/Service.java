@@ -70,6 +70,8 @@ import org.jbpm.process.longrest.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.jbpm.process.longrest.HeartbeatMonitorCommand.DIED_SIGNAL;
+
 @Path("/demo-service")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
@@ -131,7 +133,7 @@ public class Service {
             PreBuildRequest request,
             @QueryParam("callbackDelay") @DefaultValue("3") int callbackDelay,
             @QueryParam("cancelDelay") @DefaultValue("1") String cancelDelay,
-            @QueryParam("cancelHeartBeatAfter") @DefaultValue("5") String cancelHeartBeatAfter)
+            @QueryParam("signalDiedAfter") @DefaultValue("-1") int signalDiedAfter)
             throws JsonProcessingException {
         logger.info("> PreBuild requested.");
         logger.info("> Request object: " + objectMapper.writeValueAsString(request));
@@ -145,10 +147,13 @@ public class Service {
         result.put("status", "SUCCESS");
 
         if (request.getHeartBeat() != null) {
-            ScheduledFuture<?> heartBeat = startHeartBeat(request.getHeartBeat().getUrl());
-            //end hearth beat after cancelHeartBeatAfter
+            startHeartBeat(request.getHeartBeat().getUrl());
+        }
+        //Mock signal died after. In production the process instance is signalled from HeartbeatMonitorCommand.
+        if (signalDiedAfter > 0) {
+            String diedUrl = request.getHeartBeat().getUrl().replace("imAlive", DIED_SIGNAL);
             executorService.schedule(
-                    () -> heartBeat.cancel(true), Long.parseLong(cancelHeartBeatAfter), TimeUnit.SECONDS);
+                    () -> executeRequest(diedUrl, "POST", Collections.emptyList(), null, serviceListener()), signalDiedAfter, TimeUnit.SECONDS);
         }
 
         Map<String, Object> response = new HashMap<>();

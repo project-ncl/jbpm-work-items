@@ -216,6 +216,4 @@ public class LongRunningRestServiceWorkItemHandler extends AbstractLogOrThrowWor
     public void abortWorkItem(WorkItem workItem, WorkItemManager manager) {
         completeWorkItem(manager, workItem.getId(), new WorkitemAbortedException());
     }
-
 }
-
