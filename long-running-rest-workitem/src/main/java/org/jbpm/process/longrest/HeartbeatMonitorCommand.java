@@ -35,10 +35,13 @@ import org.kie.api.runtime.query.QueryContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class HeartbeatMonitorCommand implements Command, Reoccurring { //TODO write test
+public class HeartbeatMonitorCommand implements Command, Reoccurring {
 
     private static final Logger logger = LoggerFactory.getLogger(HeartbeatMonitorCommand.class);
     private static final List<Integer> activeStates = Collections.singletonList(1);
+
+    public static final String DIED_SIGNAL = "died";
+
     private String interval = "PT5S";
 
     @Override
@@ -93,7 +96,7 @@ public class HeartbeatMonitorCommand implements Command, Reoccurring { //TODO wr
         logger.debug("Heartbeat evaluation for pid: {}. LastBeat: {}, sinceLastBeat: {}.", processInstanceId, lastBeat, sinceLastBeat);
         if (sinceLastBeat.compareTo(heartbeatTimeout) > 0) {
             logger.info("Signalling pid: {} DIED ...", processInstanceId);
-            processService.signalProcessInstance(processInstanceId, "died", null);
+            processService.signalProcessInstance(processInstanceId, DIED_SIGNAL, null);
             logger.debug("Signalled died for pid: {}.", processInstanceId);
         }
         logger.debug("Heartbeat evaluation for pid: {} completed.", processInstanceId);

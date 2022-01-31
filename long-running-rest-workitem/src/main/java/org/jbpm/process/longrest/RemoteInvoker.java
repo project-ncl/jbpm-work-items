@@ -56,9 +56,7 @@ public class RemoteInvoker {
 
     private final long processInstanceId;
     private final String containerId;
-    private final int socketTimeout;
-    private final int connectTimeout;
-    private final int connectionRequestTimeout;
+    private final HttpClient httpClient;
 
     public RemoteInvoker(
             String containerId,
@@ -68,9 +66,17 @@ public class RemoteInvoker {
             int connectionRequestTimeout) {
         this.containerId = containerId;
         this.processInstanceId = processInstanceId;
-        this.socketTimeout = socketTimeout;
-        this.connectTimeout = connectTimeout;
-        this.connectionRequestTimeout = connectionRequestTimeout;
+
+        RequestConfig config = RequestConfig.custom()
+                .setSocketTimeout(socketTimeout)
+                .setConnectTimeout(connectTimeout)
+                .setConnectionRequestTimeout(connectionRequestTimeout)
+                .build();
+
+        HttpClientBuilder clientBuilder = HttpClientBuilder.create()
+                .setDefaultRequestConfig(config);
+
+        httpClient = clientBuilder.build();
     }
 
     public RemoteInvocationResult invoke(
@@ -171,17 +177,6 @@ public class RemoteInvoker {
             String requestUrl,
             String jsonContent,
             Map<String, String> requestHeaders) throws RemoteInvocationException {
-
-        RequestConfig config = RequestConfig.custom()
-                .setSocketTimeout(socketTimeout)
-                .setConnectTimeout(connectTimeout)
-                .setConnectionRequestTimeout(connectionRequestTimeout)
-                .build();
-
-        HttpClientBuilder clientBuilder = HttpClientBuilder.create()
-                .setDefaultRequestConfig(config);
-
-        HttpClient httpClient = clientBuilder.build();
 
         RequestBuilder requestBuilder = RequestBuilder.create(httpMethod).setUri(requestUrl);
 

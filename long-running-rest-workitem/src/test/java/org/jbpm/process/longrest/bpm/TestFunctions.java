@@ -63,7 +63,7 @@ public class TestFunctions implements java.io.Serializable {
                 systemVariables.getCallbackUrl(),
                 systemVariables.getCallbackMethod()
         ));
-        if (addHeartBeatToRequest) { //TODO test without heartbeat executor
+        if (addHeartBeatToRequest) {
             preBuildRequest.setHeartBeat(new Request(
                     systemVariables.getHeartBeatUrl(),
                     systemVariables.getHeartBeatMethod()
