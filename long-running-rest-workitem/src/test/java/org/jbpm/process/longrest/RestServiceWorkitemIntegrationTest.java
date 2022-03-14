@@ -462,7 +462,18 @@ public class RestServiceWorkitemIntegrationTest extends JbpmJUnitBaseTestCase {
         RuntimeEngine runtimeEngine = getRuntimeEngine();
         KieSession kieSession = runtimeEngine.getKieSession();
 
-        ProcessInstance processInstance = (ProcessInstance) kieSession.startProcess("org.jbpm.process.longrest.executerest", getExecuteRestParameters());
+        Map<String, Object> processParameters = getExecuteRestParameters();
+        //test parameters
+        processParameters.put("requestMethod", null);
+        String validUrl = (String) processParameters.put("requestUrl", "invalid-url");
+        ExecuteRestConfiguration configOverride = ExecuteRestConfiguration.builder()
+                //should use requestMethod from config
+                .requestMethod("POST")
+                //should override requestUrl with value from config
+                .requestUrl(validUrl)
+                .build();
+        processParameters.put("config", configOverride);
+        ProcessInstance processInstance = (ProcessInstance) kieSession.startProcess("org.jbpm.process.longrest.executerest", processParameters);
         manager.disposeRuntimeEngine(runtimeEngine);
 
         boolean completed = processFinished.tryAcquire(15, TimeUnit.SECONDS);
