@@ -41,8 +41,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Wid(widfile = "LongRunningRestService.wid",
-        name = "LongRunningRestService",
-        displayName = "LongRunningRestService",
+        name = "LongRunningRestService-7.59.0-SNAPSHOT",
+        displayName = "LongRunningRestService 7.59.0-SNAPSHOT",
         defaultHandler = "mvel: new org.jbpm.process.longrest.LongRunningRestServiceWorkItemHandler(runtimeManager)",
         category = "long-running-rest-workitem",
         documentation = "",
