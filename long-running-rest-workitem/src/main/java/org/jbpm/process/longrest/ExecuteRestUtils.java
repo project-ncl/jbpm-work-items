@@ -3,7 +3,9 @@ package org.jbpm.process.longrest;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Map;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.jbpm.process.longrest.util.Mapper;
 import org.jbpm.process.longrest.util.Strings;
 import org.kie.api.runtime.process.ProcessContext;
@@ -17,9 +19,25 @@ public class ExecuteRestUtils {
 
     private static final Logger logger = LoggerFactory.getLogger(ExecuteRestUtils.class);
 
-//    public static ExecuteRestConfiguration overrideWithContextParameters(ExecuteRestConfiguration config, ProcessContext processContext) {
-    public static ExecuteRestConfiguration getExecuteRestConfiguration(ProcessContext processContext, ExecuteRestConfiguration overrides) {
-        logger.debug("Overrides: {}", overrides );
+    public static ExecuteRestConfiguration getExecuteRestConfiguration(ProcessContext processContext, Object executeRestConfig) {
+        logger.trace("Overrides: {}", executeRestConfig );
+        ExecuteRestConfiguration overrides;
+        if (executeRestConfig == null) {
+            overrides = null;
+        } else if (executeRestConfig instanceof ExecuteRestConfiguration) {
+            overrides = (ExecuteRestConfiguration) executeRestConfig;
+        } else if (executeRestConfig instanceof Map) {
+            overrides = Mapper.getInstance().convertValue(executeRestConfig, ExecuteRestConfiguration.class);
+        } else if (executeRestConfig instanceof String) {
+            // used as workaround as BPM unmarshal parameter to string instead of typed object
+            try {
+                overrides = Mapper.getInstance().readValue((String) executeRestConfig, ExecuteRestConfiguration.class);
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException("Cannot parse input configuration from String, expecting json string.", e);
+            }
+        } else {
+            throw new RuntimeException("Invalid input configuration type: " + executeRestConfig.getClass().getName());
+        }
         try {
             ExecuteRestConfiguration result = new ExecuteRestConfiguration();
             Method[] methods = ExecuteRestConfiguration.class.getDeclaredMethods();
@@ -39,7 +57,7 @@ public class ExecuteRestUtils {
                     }
                 }
             }
-            logger.debug("Updated configuration: {}", result );
+            logger.trace("Updated configuration: {}", result );
             return result;
         } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
             throw new RuntimeException("Cannot override parameters.", e);

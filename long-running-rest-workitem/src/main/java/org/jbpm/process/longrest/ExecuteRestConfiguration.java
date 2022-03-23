@@ -2,6 +2,9 @@ package org.jbpm.process.longrest;
 
 import java.io.Serializable;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import org.jbpm.process.longrest.util.Mapper;
+
 /**
  * @author <a href="mailto:matejonnet@gmail.com">Matej Lazar</a>
  */
@@ -314,6 +317,14 @@ public class ExecuteRestConfiguration implements Serializable {
             executeRestConfiguration.ignoreCancelSignals = this.ignoreCancelSignals;
             executeRestConfiguration.cancelTimeout = this.cancelTimeout;
             return executeRestConfiguration;
+        }
+    }
+
+    public String asJson() {
+        try {
+            return Mapper.getInstance().writeValueAsString(this);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Cannot convert to json.", e);
         }
     }
 
