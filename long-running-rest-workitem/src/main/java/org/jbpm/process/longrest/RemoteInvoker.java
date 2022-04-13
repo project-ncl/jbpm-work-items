@@ -180,8 +180,15 @@ public class RemoteInvoker {
 
         RequestBuilder requestBuilder = RequestBuilder.create(httpMethod).setUri(requestUrl);
 
+        Map<String, String> requestHeadersSanitized;
         if (requestHeaders != null) {
             requestHeaders.forEach((k, v) -> requestBuilder.addHeader(k, v));
+            requestHeadersSanitized = requestHeaders.entrySet().stream()
+                    .collect(Collectors.toMap(
+                            Map.Entry::getKey,
+                            e -> hideTokens(e)));
+        } else {
+            requestHeadersSanitized = Collections.emptyMap();
         }
 
         if (jsonContent != null && !jsonContent.equals("")) {
@@ -190,7 +197,7 @@ public class RemoteInvoker {
             requestBuilder.setEntity(entity);
         }
 
-        logger.info("Invoking remote endpoint {} {} Headers: {} Body: {}.", httpMethod, requestUrl, requestHeaders, jsonContent);
+        logger.info("Invoking remote endpoint {} {} Headers: {} Body: {}.", httpMethod, requestUrl, requestHeadersSanitized, jsonContent);
 
         HttpResponse httpResponse;
         try {
@@ -199,6 +206,14 @@ public class RemoteInvoker {
             throw new RemoteInvocationException("Unable to invoke remote endpoint.", e);
         }
         return httpResponse;
+    }
+
+    private String hideTokens(Map.Entry<String, String> entry) {
+        if ("authorization".equalsIgnoreCase(entry.getKey())) {
+            return "***";
+        } else {
+            return entry.getValue();
+        }
     }
 
     private String parseCancelUrl(
