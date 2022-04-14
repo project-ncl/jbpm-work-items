@@ -21,9 +21,16 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.lang3.StringEscapeUtils;
+import org.jbpm.process.longrest.RemoteInvoker;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Json {
+
+    private static final Logger logger = LoggerFactory.getLogger(Json.class);
 
     public static <T> T escape(T o) {
         if (o == null) {
@@ -72,6 +79,33 @@ public class Json {
                     .collect(Collectors.toSet());
         } else {
             return o;
+        }
+    }
+
+    public static String sanitiseSerializedObject(String serialized) throws JsonProcessingException {
+        ObjectMapper mapper = Mapper.getInstance();
+        Map object = mapper.readValue(serialized, Map.class);
+        return mapper.writeValueAsString(sanitizeMap(object));
+    }
+
+    public static Map<String, ?> sanitizeMap(Map<String, ?> object) {
+        return object.entrySet().stream()
+                //Collectors.toMap fails on null values https://bugs.openjdk.java.net/browse/JDK-8148463
+                .collect(HashMap::new, (m,entry) -> {
+                    logger.trace("Entry: {} - {}, ", entry.getKey(), entry.getValue());
+                    if (entry.getValue() != null && entry.getValue() instanceof Map) {
+                        m.put(entry.getKey(), sanitizeMap((Map<String, ?>)entry.getValue()));
+                    } else {
+                        m.put(entry.getKey(), sanitizeValue(entry));
+                    }
+                }, HashMap::putAll);
+    }
+
+    private static Object sanitizeValue(Map.Entry<String, ?> entry) {
+        if ("authorization".equalsIgnoreCase(entry.getKey())) {
+            return "***";
+        } else {
+            return entry.getValue();
         }
     }
 }

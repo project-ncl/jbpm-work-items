@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeType;
@@ -39,6 +40,7 @@ import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
+import org.jbpm.process.longrest.util.Json;
 import org.jbpm.process.longrest.util.Mapper;
 import org.jbpm.process.longrest.util.Strings;
 import org.slf4j.Logger;
@@ -183,21 +185,26 @@ public class RemoteInvoker {
         Map<String, String> requestHeadersSanitized;
         if (requestHeaders != null) {
             requestHeaders.forEach((k, v) -> requestBuilder.addHeader(k, v));
-            requestHeadersSanitized = requestHeaders.entrySet().stream()
-                    .collect(Collectors.toMap(
-                            Map.Entry::getKey,
-                            e -> hideTokens(e)));
+            requestHeadersSanitized = (Map<String, String>) Json.sanitizeMap(requestHeaders);
         } else {
             requestHeadersSanitized = Collections.emptyMap();
         }
 
+        String jsonContentSanitised;
         if (jsonContent != null && !jsonContent.equals("")) {
             requestBuilder.setHeader("Content-Type", "application/json");
             StringEntity entity = new StringEntity(jsonContent, ContentType.APPLICATION_JSON);
             requestBuilder.setEntity(entity);
+            try {
+                jsonContentSanitised = Json.sanitiseSerializedObject(jsonContent);
+            } catch (JsonProcessingException e) {
+                throw new RemoteInvocationException("Cannot sanitize content.", e);
+            }
+        } else {
+            jsonContentSanitised = jsonContent;
         }
 
-        logger.info("Invoking remote endpoint {} {} Headers: {} Body: {}.", httpMethod, requestUrl, requestHeadersSanitized, jsonContent);
+        logger.info("Invoking remote endpoint {} {} Headers: {} Body: {}.", httpMethod, requestUrl, requestHeadersSanitized, jsonContentSanitised);
 
         HttpResponse httpResponse;
         try {
@@ -206,14 +213,6 @@ public class RemoteInvoker {
             throw new RemoteInvocationException("Unable to invoke remote endpoint.", e);
         }
         return httpResponse;
-    }
-
-    private String hideTokens(Map.Entry<String, String> entry) {
-        if ("authorization".equalsIgnoreCase(entry.getKey())) {
-            return "***";
-        } else {
-            return entry.getValue();
-        }
     }
 
     private String parseCancelUrl(
