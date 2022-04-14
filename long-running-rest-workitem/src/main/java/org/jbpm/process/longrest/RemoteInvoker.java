@@ -182,29 +182,22 @@ public class RemoteInvoker {
 
         RequestBuilder requestBuilder = RequestBuilder.create(httpMethod).setUri(requestUrl);
 
-        Map<String, String> requestHeadersSanitized;
         if (requestHeaders != null) {
             requestHeaders.forEach((k, v) -> requestBuilder.addHeader(k, v));
-            requestHeadersSanitized = (Map<String, String>) Json.sanitizeMap(requestHeaders);
-        } else {
-            requestHeadersSanitized = Collections.emptyMap();
         }
 
-        String jsonContentSanitised;
         if (jsonContent != null && !jsonContent.equals("")) {
             requestBuilder.setHeader("Content-Type", "application/json");
             StringEntity entity = new StringEntity(jsonContent, ContentType.APPLICATION_JSON);
             requestBuilder.setEntity(entity);
-            try {
-                jsonContentSanitised = Json.sanitiseSerializedObject(jsonContent);
-            } catch (JsonProcessingException e) {
-                throw new RemoteInvocationException("Cannot sanitize content.", e);
-            }
-        } else {
-            jsonContentSanitised = jsonContent;
         }
 
-        logger.info("Invoking remote endpoint {} {} Headers: {} Body: {}.", httpMethod, requestUrl, requestHeadersSanitized, jsonContentSanitised);
+        if (logger.isTraceEnabled()) {
+            // Headers and body might include sensitive data like authorization tokens.
+            logger.trace("Invoking remote endpoint {} {} Headers: {} Body: {}.", httpMethod, requestUrl, requestHeaders, jsonContent);
+        } else {
+            logger.info("Invoking remote endpoint {} {}.", httpMethod, requestUrl);
+        }
 
         HttpResponse httpResponse;
         try {
