@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeType;
@@ -40,7 +39,6 @@ import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
-import org.jbpm.process.longrest.util.Json;
 import org.jbpm.process.longrest.util.Mapper;
 import org.jbpm.process.longrest.util.Strings;
 import org.slf4j.Logger;
@@ -90,7 +88,7 @@ public class RemoteInvoker {
             String requestHeaders,
             Map<String, String> cookies) throws RemoteInvocationException, ResponseProcessingException {
 
-        logger.debug("requestTemplate: {}", requestTemplate);
+        logger.trace("requestTemplate: {}", requestTemplate);
 
         Map<String, Object> variables = new HashMap<>();
         variables.put(PROCESS_INSTANCE_ID_VARIABLE, processInstanceId);
