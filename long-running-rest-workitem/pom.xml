@@ -10,7 +10,7 @@
 
   <groupId>org.jboss.pnc.bpm.workitems</groupId>
   <artifactId>long-running-rest-workitem</artifactId>
-  <version>7.59.2-SNAPSHOT</version>
+  <version>7.59.2</version>
   <name>Long Running REST</name>
   <description>Workitem for invoking long-running REST tasks with callback</description>
   <properties>
@@ -21,7 +21,7 @@
     <connection>scm:git:https://github.com/project-ncl/jbpm-work-items.git</connection>
     <developerConnection>scm:git:git@github.com:project-ncl/jbpm-work-items.git</developerConnection>
     <url>https://github.com/project-ncl/jbpm-work-items</url>
-    <tag>HEAD</tag>
+    <tag>7.59.2.Pnc</tag>
   </scm>
 
   <dependencyManagement>
