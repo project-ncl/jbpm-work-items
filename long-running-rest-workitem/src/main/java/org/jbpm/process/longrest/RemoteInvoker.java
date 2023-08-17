@@ -28,9 +28,11 @@ import java.util.stream.Collectors;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeType;
+import main.java.org.jbpm.process.longrest.authentication.OidcClient;
 import org.apache.commons.text.StringSubstitutor;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
+import org.apache.http.HttpHeaders;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.config.RequestConfig;
@@ -57,15 +59,18 @@ public class RemoteInvoker {
     private final long processInstanceId;
     private final String containerId;
     private final HttpClient httpClient;
+    private final boolean authTokenRequired;
 
     public RemoteInvoker(
             String containerId,
             long processInstanceId,
             int socketTimeout,
             int connectTimeout,
-            int connectionRequestTimeout) {
+            int connectionRequestTimeout,
+            boolean authTokenRequired) {
         this.containerId = containerId;
         this.processInstanceId = processInstanceId;
+        this.authTokenRequired = authTokenRequired;
 
         RequestConfig config = RequestConfig.custom()
                 .setSocketTimeout(socketTimeout)
@@ -96,7 +101,7 @@ public class RemoteInvoker {
         StringSubstitutor sub = new StringSubstitutor(variables, "$(", ")");
 
         String requestBodyEvaluated;
-        if (requestTemplate != null && !requestTemplate.equals("")) {
+        if (requestTemplate != null && !requestTemplate.isEmpty()) {
             requestBodyEvaluated = sub.replace(requestTemplate);
         } else {
             requestBodyEvaluated = "";
@@ -111,6 +116,11 @@ public class RemoteInvoker {
             requestHeadersMap.put("Cookie", cookieHeader);
         }
         requestHeadersMap.putAll(Strings.toMap(requestHeaders));
+
+        if (authTokenRequired) {
+            requestHeadersMap.put(HttpHeaders.AUTHORIZATION, "Bearer " + OidcClient.getAccessToken());
+        }
+
         HttpResponse httpResponse = httpRequest(
                 httpMethod,
                 requestUrl,

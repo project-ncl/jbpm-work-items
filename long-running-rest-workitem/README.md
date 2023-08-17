@@ -167,3 +167,12 @@ Look-up order (first found is used):
 - System.getenv("HOSTNAME_HTTPS")
 - System.getenv("HOSTNAME_HTTP")
 ```
+
+To inject access tokens to the HTTP request, the `authTokenRequired` variable must be set to true (default) and the following environment variables must be defined:
+
+- `SSO_URL`: the base url of the SSO server
+- `SSO_REALM`: the realm of the SSO server
+- `SSO_SERVICE_ACCOUNT_CLIENT`: the service account client id
+- `SSO_SERVICE_ACCOUNT_SECRET`: the service account secret
+
+The client credentials flow is used to obtain the access token.

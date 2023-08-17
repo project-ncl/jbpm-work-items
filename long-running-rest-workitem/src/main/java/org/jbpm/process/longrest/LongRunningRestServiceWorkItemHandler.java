@@ -55,7 +55,8 @@ import org.slf4j.LoggerFactory;
                 @WidParameter(name = "cancelUrlTemplate", required = false),
                 @WidParameter(name = "socketTimeout", required = false),
                 @WidParameter(name = "connectTimeout", required = false),
-                @WidParameter(name = "connectionRequestTimeout", required = false)
+                @WidParameter(name = "connectionRequestTimeout", required = false),
+                @WidParameter(name = "authTokenRequired", required = false)
         },
         results = {
                 @WidResult(name = "responseCode"),
@@ -116,13 +117,15 @@ public class LongRunningRestServiceWorkItemHandler extends AbstractLogOrThrowWor
             int socketTimeout = ProcessUtils.getParameter(workItem, "socketTimeout", 30000);
             int connectTimeout = ProcessUtils.getParameter(workItem, "connectTimeout", 5000);
             int connectionRequestTimeout = ProcessUtils.getParameter(workItem, "connectionRequestTimeout", 0);
+            boolean authTokenRequired = ProcessUtils.getParameter(workItem, "authTokenRequired", false);
 
             RemoteInvoker remoteInvoker = new RemoteInvoker(
                     containerId,
                     processInstanceId,
                     socketTimeout,
                     connectTimeout,
-                    connectionRequestTimeout);
+                    connectionRequestTimeout,
+                    authTokenRequired);
 
             try {
                 RemoteInvocationResult result = remoteInvoker.invoke(
