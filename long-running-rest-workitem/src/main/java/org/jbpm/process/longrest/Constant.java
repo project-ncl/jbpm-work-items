@@ -37,4 +37,8 @@ public class Constant {
 
     public static final String CONTAINER_ID_VARIABLE = "containerId";
 
+    public static final String SSO_URL_VARIABLE = "SSO_URL";
+    public static final String SSO_REALM_VARIABLE = "SSO_REALM";
+    public static final String SSO_SERVICE_ACCOUNT_CLIENT_VARIABLE = "SSO_SERVICE_ACCOUNT_CLIENT";
+    public static final String SSO_SERVICE_ACCOUNT_SECRET_VARIABLE = "SSO_SERVICE_ACCOUNT_SECRET";
 }
