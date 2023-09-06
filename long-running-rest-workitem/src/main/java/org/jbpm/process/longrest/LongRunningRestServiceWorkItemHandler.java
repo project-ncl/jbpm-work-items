@@ -117,7 +117,7 @@ public class LongRunningRestServiceWorkItemHandler extends AbstractLogOrThrowWor
             int socketTimeout = ProcessUtils.getParameter(workItem, "socketTimeout", 30000);
             int connectTimeout = ProcessUtils.getParameter(workItem, "connectTimeout", 5000);
             int connectionRequestTimeout = ProcessUtils.getParameter(workItem, "connectionRequestTimeout", 0);
-            boolean authTokenRequired = ProcessUtils.getParameter(workItem, "authTokenRequired", false);
+            boolean authTokenRequired = ProcessUtils.getParameter(workItem, "authTokenRequired", true);
 
             RemoteInvoker remoteInvoker = new RemoteInvoker(
                     containerId,
