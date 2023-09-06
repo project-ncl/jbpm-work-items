@@ -23,10 +23,10 @@ import org.junit.Test;
 public class OidcClientTest {
 
     @Test
-    public void testGetTokenFailsIfEnvVarMissing() {
+    public void testGetEmptyTokenIfEnvVarMissing() {
         // make sure one of the env vars that OidcClient needs is not set
         Assert.assertNull(System.getenv(Constant.SSO_SERVICE_ACCOUNT_SECRET_VARIABLE));
 
-        Assert.assertThrows(RuntimeException.class, OidcClient::getAccessToken);
+        Assert.assertEquals("", OidcClient.getAccessToken());
     }
 }
