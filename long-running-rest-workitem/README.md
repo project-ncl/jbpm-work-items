@@ -175,7 +175,4 @@ To inject access tokens to the HTTP request, the `authTokenRequired` variable mu
 - `SSO_SERVICE_ACCOUNT_CLIENT`: the service account client id
 - `SSO_SERVICE_ACCOUNT_SECRET`: the service account secret
 
-The following Java property can be set when running tests to "mock" OidcClient
-- `SSO_OIDC_BEING_TESTED`: set to "true" if we are running inside a unit test to return a bogus value to facilitate integration tests
-
 The client credentials flow is used to obtain the access token.
