@@ -6,6 +6,8 @@ import org.keycloak.authorization.client.AuthzClient;
 import org.keycloak.authorization.client.Configuration;
 
 import java.util.Collections;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Class to obtain an OIDC Access token. The environment variables: SSO_URL, SSO_REALM,
@@ -13,7 +15,14 @@ import java.util.Collections;
  */
 public class OidcClient {
 
+    private static final Logger logger = LoggerFactory.getLogger(OidcClient.class);
+
     public static String getAccessToken() {
+
+        if (System.getProperty(Constant.SSO_OIDC_BEING_TESTED, "false").equals("true")) {
+            logger.warn("SSO_OIDC_BEING_TESTED set to true. Returning bogus value for getAccessToken");
+            return "1234";
+        }
 
         checkIfEnvironmentVariableExists(Constant.SSO_URL_VARIABLE);
         checkIfEnvironmentVariableExists(Constant.SSO_REALM_VARIABLE);

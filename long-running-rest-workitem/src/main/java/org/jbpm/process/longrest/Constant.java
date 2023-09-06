@@ -41,4 +41,7 @@ public class Constant {
     public static final String SSO_REALM_VARIABLE = "SSO_REALM";
     public static final String SSO_SERVICE_ACCOUNT_CLIENT_VARIABLE = "SSO_SERVICE_ACCOUNT_CLIENT";
     public static final String SSO_SERVICE_ACCOUNT_SECRET_VARIABLE = "SSO_SERVICE_ACCOUNT_SECRET";
+
+    // Is the OidcClient being tested in a unit test?
+    public static final String SSO_OIDC_BEING_TESTED = "SSO_OIDC_BEING_TESTED";
 }
