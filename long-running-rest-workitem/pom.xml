@@ -86,11 +86,17 @@
         <groupId>org.kie</groupId>
         <artifactId>kie-internal</artifactId>
       </dependency>
-        <dependency>
-          <groupId>org.keycloak</groupId>
-          <artifactId>keycloak-authz-client</artifactId>
-          <version>22.0.1</version>
-        </dependency>
+      <dependency>
+        <groupId>com.konghq</groupId>
+        <artifactId>unirest-java</artifactId>
+        <version>3.11.09</version>
+        <classifier>standalone</classifier>
+      </dependency>
+      <dependency>
+        <groupId>com.konghq</groupId>
+        <artifactId>unirest-objectmapper-jackson</artifactId>
+        <version>3.11.09</version>
+    </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -156,6 +162,22 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
+      <groupId>com.konghq</groupId>
+      <artifactId>unirest-java</artifactId>
+      <classifier>standalone</classifier>
+      <exclusions>
+        <exclusion>
+            <artifactId>commons-logging</artifactId>
+            <groupId>commons-logging</groupId>
+        </exclusion>
+    </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.konghq</groupId>
+      <artifactId>unirest-objectmapper-jackson</artifactId>
+    </dependency>
+
+    <dependency>
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpclient</artifactId>
       <exclusions>
@@ -171,11 +193,6 @@
       <artifactId>template-resources</artifactId>
       <scope>provided</scope>
     </dependency>
-    <dependency>
-      <groupId>org.keycloak</groupId>
-      <artifactId>keycloak-authz-client</artifactId>
-    </dependency>
-
     <dependency>
       <groupId>org.jboss.resteasy</groupId>
       <artifactId>resteasy-undertow</artifactId>
